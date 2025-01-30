@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 const MarkdownUpload = () => {
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
 
@@ -29,7 +29,7 @@ const MarkdownUpload = () => {
     if (!isValidType) {
       toast({
         title: "Invalid file type",
-        description: "Please upload only markdown (.md or .markdown) files",
+        description: `${file.name} is not a markdown file. Please upload only .md or .markdown files.`,
         variant: "destructive",
       });
       return false;
@@ -37,25 +37,37 @@ const MarkdownUpload = () => {
     return true;
   };
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
+  const processFiles = (files: FileList | null) => {
+    if (!files) return;
     
-    const file = e.dataTransfer.files[0];
-    if (file && validateFile(file)) {
-      setSelectedFile(file);
-    }
-  }, [toast]);
+    const validFiles: File[] = [];
+    Array.from(files).forEach(file => {
+      if (validateFile(file)) {
+        validFiles.push(file);
+      }
+    });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && validateFile(file)) {
-      setSelectedFile(file);
+    if (validFiles.length > 0) {
+      setSelectedFiles(prev => [...prev, ...validFiles]);
+      toast({
+        title: "Files added",
+        description: `${validFiles.length} markdown ${validFiles.length === 1 ? 'file' : 'files'} selected.`,
+      });
     }
   };
 
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    processFiles(e.dataTransfer.files);
+  }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    processFiles(e.target.files);
+  };
+
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
 
     setIsUploading(true);
     try {
@@ -64,13 +76,13 @@ const MarkdownUpload = () => {
       
       toast({
         title: "Success!",
-        description: `${selectedFile.name} has been uploaded successfully.`,
+        description: `${selectedFiles.length} ${selectedFiles.length === 1 ? 'file has' : 'files have'} been uploaded successfully.`,
       });
-      setSelectedFile(null);
+      setSelectedFiles([]);
     } catch (error) {
       toast({
         title: "Upload failed",
-        description: "There was an error uploading your file.",
+        description: "There was an error uploading your files.",
         variant: "destructive",
       });
     } finally {
@@ -78,12 +90,16 @@ const MarkdownUpload = () => {
     }
   };
 
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md space-y-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Upload Markdown File</h1>
-          <p className="text-gray-600">Drag and drop your markdown file here or click to browse</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Upload Markdown Files</h1>
+          <p className="text-gray-600">Drag and drop your markdown files or folder here</p>
         </div>
         
         <div
@@ -102,28 +118,43 @@ const MarkdownUpload = () => {
             id="file-input"
             className="hidden"
             accept=".md,.markdown"
+            multiple
+            webkitdirectory=""
             onChange={handleFileSelect}
           />
           <Upload className="mx-auto h-12 w-12 text-gray-400" />
-          {selectedFile ? (
-            <p className="mt-4 text-sm text-gray-600">
-              Selected: {selectedFile.name}
-            </p>
-          ) : (
-            <p className="mt-4 text-sm text-gray-600">
-              Drop your markdown file here or click to select
-            </p>
-          )}
+          <p className="mt-4 text-sm text-gray-600">
+            Drop your markdown files or folder here, or click to select
+          </p>
         </div>
 
-        {selectedFile && (
-          <Button
-            className="w-full"
-            onClick={handleUpload}
-            disabled={isUploading}
-          >
-            {isUploading ? "Uploading..." : "Upload File"}
-          </Button>
+        {selectedFiles.length > 0 && (
+          <div className="space-y-2">
+            <div className="bg-white rounded-lg shadow p-4 max-h-60 overflow-y-auto">
+              {selectedFiles.map((file, index) => (
+                <div key={index} className="flex items-center justify-between py-2">
+                  <span className="text-sm text-gray-600 truncate">{file.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeFile(index)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <Button
+              className="w-full"
+              onClick={handleUpload}
+              disabled={isUploading}
+            >
+              {isUploading 
+                ? `Uploading ${selectedFiles.length} ${selectedFiles.length === 1 ? 'file' : 'files'}...` 
+                : `Upload ${selectedFiles.length} ${selectedFiles.length === 1 ? 'file' : 'files'}`}
+            </Button>
+          </div>
         )}
       </div>
     </div>
