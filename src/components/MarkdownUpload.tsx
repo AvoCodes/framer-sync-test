@@ -4,10 +4,17 @@ import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+interface StoredFile {
+  name: string;
+  content: string;
+  path?: string;
+}
+
 const MarkdownUpload = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [storedFiles, setStoredFiles] = useState<StoredFile[]>([]);
   const { toast } = useToast();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -66,23 +73,41 @@ const MarkdownUpload = () => {
     processFiles(e.target.files);
   };
 
+  const readFileContent = async (file: File): Promise<StoredFile> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        resolve({
+          name: file.name,
+          content: e.target?.result as string,
+          path: file.webkitRelativePath || undefined
+        });
+      };
+      reader.onerror = () => reject(new Error(`Failed to read file ${file.name}`));
+      reader.readAsText(file);
+    });
+  };
+
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
 
     setIsUploading(true);
     try {
-      // Simulated upload delay - replace with actual upload logic
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const fileContents = await Promise.all(
+        selectedFiles.map(file => readFileContent(file))
+      );
+      
+      setStoredFiles(prev => [...prev, ...fileContents]);
       
       toast({
         title: "Success!",
-        description: `${selectedFiles.length} ${selectedFiles.length === 1 ? 'file has' : 'files have'} been uploaded successfully.`,
+        description: `${selectedFiles.length} ${selectedFiles.length === 1 ? 'file has' : 'files have'} been stored successfully.`,
       });
       setSelectedFiles([]);
     } catch (error) {
       toast({
         title: "Upload failed",
-        description: "There was an error uploading your files.",
+        description: "There was an error reading your files.",
         variant: "destructive",
       });
     } finally {
@@ -154,6 +179,22 @@ const MarkdownUpload = () => {
                 ? `Uploading ${selectedFiles.length} ${selectedFiles.length === 1 ? 'file' : 'files'}...` 
                 : `Upload ${selectedFiles.length} ${selectedFiles.length === 1 ? 'file' : 'files'}`}
             </Button>
+          </div>
+        )}
+
+        {storedFiles.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-4 mt-4">
+            <h2 className="text-lg font-semibold mb-2">Stored Files</h2>
+            <div className="max-h-60 overflow-y-auto">
+              {storedFiles.map((file, index) => (
+                <div key={index} className="py-2 border-b last:border-b-0">
+                  <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                  {file.path && (
+                    <p className="text-xs text-gray-500">Path: {file.path}</p>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
