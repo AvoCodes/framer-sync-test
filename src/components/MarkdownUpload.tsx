@@ -119,7 +119,7 @@ const MarkdownUpload = () => {
             className="hidden"
             accept=".md,.markdown"
             multiple
-            webkitdirectory=""
+            webkitdirectory={true}
             onChange={handleFileSelect}
           />
           <Upload className="mx-auto h-12 w-12 text-gray-400" />
